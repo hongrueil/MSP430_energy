@@ -3,8 +3,9 @@
 #include <stdio.h>
 
 extern void shutdown_asm(void);
+
 void set_freq(uint8_t clk);
-void FRAM_Write(unsigned int StartAddress);
+__attribute__((ramfunc)) void access(uint8_t *StartAddress);
 void initialize_port(void);
 
 #pragma NOINIT(arr)
@@ -15,25 +16,7 @@ void main(void) {
   WDTCTL = WDTPW | WDTHOLD;               // Stop watchdog timer
   initialize_port();
   set_freq(1);
-  int i = 0;
-  int j = 0;
-  uint8_t data = 0x1;
-  uint8_t *arr_ptr = arr;
-  // initialize arr
-  for (i = 0; i < 2048; ++i) {
-    *arr_ptr++ = data;
-  }
-  data = 0x2;
-  // access 512 * 2048 = 1048576 byte
-  for (i = 0; i < 512; ++i) {
-    arr_ptr = arr;
-    for (j = 0; j < 2048; ++j) {
-      //*arr_ptr = data; //FRAM write
-      //data = *arr_ptr; //FRAM read
-      arr_ptr++;
-    }
-    *arr_ptr = data; // avoid compiler optimization
-  }
+  access(arr);
   shutdown_asm();
 }
 // set system clk to 1, 8, 16, 24
@@ -147,21 +130,33 @@ void initialize_port(void) {
   PM5CTL0 &= ~LOCKLPM5;
 }
 /**********************************************************************//**
- * @brief  Performs 512 byte FRAM Write
+ * @brief  Performs 512 time * 2048 byte access
  *
- * @param  StartAddress: For FRAM Write
+ * @param  StartAddress: For access address
  *
  * @return none
  *************************************************************************/
-/*
-void FRAM_Write(unsigned int StartAddress) {
-  unsigned long *FRAM_write_ptr;
-  unsigned long data = 0x12345678; //4 byte = 32 bits
-  unsigned int i=0;
-  FRAM_write_ptr = (unsigned long *) StartAddress;
-  for (i = 0; i < 128; ++i) {
-    *FRAM_write_ptr++ = data;
+
+void access(uint8_t *StartAddress) {
+  uint8_t *FRAM_ptr;
+  uint8_t data = 0x12; //1 byte = 8 bits
+  int i = 0;
+  int j = 0;
+  FRAM_ptr =  StartAddress;
+  // initialize arr
+  for (j = 0; j < 2048; ++j) {
+    *FRAM_ptr++ = data;
+  }
+  // access 512 * 2048 byte
+  for (i = 512; i > 0; --i) {
+    FRAM_ptr =  StartAddress;
+    for (j = 0; j < 2048; ++j) {
+      //__asm("\t   MOVA\t   0x0004(SP),R15"); // for emulate 
+      *FRAM_ptr = data; // write
+      //data = *FRAM_ptr; // read
+      FRAM_ptr++;
+    }
   }
 
 }
-*/
+
